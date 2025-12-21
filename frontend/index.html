@@ -1,22 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Student School Map</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Student School Map</title>
 
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet/dist/leaflet.css"
-  />
+    <!-- Leaflet CSS -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+    </style>
 </head>
-
 <body>
-  <h1>School Map</h1>
-  <div id="map"></div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="map.js"></script>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // 1️⃣ Create map centered roughly on Boston
+    const map = L.map('map').setView([42.3601, -71.0589], 12);
+
+    // 2️⃣ Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 3️⃣ Marker color logic
+    function getMarkerColor(type, currentStudents) {
+        if (currentStudents === 0) return 'gray';
+        if (type === 'highschool') return 'blue';
+        if (type === 'university') return 'red';
+        return 'green';
+    }
+
+    function createIcon(color) {
+        return L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                background:${color};
+                width:14px;
+                height:14px;
+                border-radius:50%;
+                border:2px solid white;
+            "></div>`
+        });
+    }
+
+    // 4️⃣ Fetch schools from backend
+    fetch("http://127.0.0.1:8000/schools")
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(school => {
+                const color = getMarkerColor(
+                    school.type,
+                    school.current_students
+                );
+
+                const marker = L.marker(
+                    [school.latitude, school.longitude],
+                    { icon: createIcon(color) }
+                ).addTo(map);
+
+                marker.bindPopup(`
+                    <strong>${school.name}</strong><br>
+                    Type: ${school.type}<br>
+                    Current students: ${school.current_students}<br>
+                    Historical students: ${school.total_students}<br>
+                    <button onclick="viewMore(${school.id})">
+                        View More
+                    </button>
+                `);
+            });
+        });
+
+    // 5️⃣ View more action
+    function viewMore(id) {
+        // Later can redirect to a detail page
+        alert("School detail page will open for ID: " + id);
+    }
+</script>
+
 </body>
 </html>

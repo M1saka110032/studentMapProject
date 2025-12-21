@@ -1,14 +1,27 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 from models import create_tables
 
+# 1️⃣ Create FastAPI app
 app = FastAPI()
 
+# 2️⃣ Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],       # allow any origin (development)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3️⃣ Database name
 DB_NAME = "database.db"
 
-# Ensure tables exist on startup
+# 4️⃣ Ensure tables exist
 create_tables()
 
+# 5️⃣ List all schools
 @app.get("/schools")
 def get_schools():
     conn = sqlite3.connect(DB_NAME)
@@ -22,7 +35,7 @@ def get_schools():
         s.latitude,
         s.longitude,
         COUNT(e.id) AS total_students,
-        SUM(CASE WHEN e.status = 'current' THEN 1 ELSE 0 END) AS current_students
+        COALESCE(SUM(CASE WHEN e.status = 'current' THEN 1 ELSE 0 END), 0) AS current_students
     FROM schools s
     LEFT JOIN enrollments e ON s.id = e.school_id
     GROUP BY s.id;
@@ -45,15 +58,13 @@ def get_schools():
 
     return schools
 
-
-from fastapi import HTTPException
-
+# 6️⃣ School detail endpoint
 @app.get("/schools/{school_id}")
 def get_school_detail(school_id: int):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # 1. Get school basic info
+    # 6a. Get school info
     cursor.execute("""
     SELECT id, name, type, latitude, longitude, website
     FROM schools
@@ -66,7 +77,7 @@ def get_school_detail(school_id: int):
         conn.close()
         raise HTTPException(status_code=404, detail="School not found")
 
-    # 2. Get students for this school
+    # 6b. Get students in this school
     cursor.execute("""
     SELECT
         s.id,
@@ -91,7 +102,7 @@ def get_school_detail(school_id: int):
             "name": r[1],
             "age": r[2],
             "grade": r[3],
-            "status": r[4],          # current / past
+            "status": r[4],
             "start_year": r[5],
             "end_year": r[6]
         })
