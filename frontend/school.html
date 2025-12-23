@@ -110,9 +110,9 @@
             .then(response => response.json())
             .then(data => {
                 // School basic info
-                document.getElementById("school-name").textContent = data.name;
-                document.getElementById("school-type").textContent = data.type;
-                document.getElementById("school-website").href = data.website;
+                document.getElementById("school-name").textContent = data.school.name;
+                document.getElementById("school-type").textContent = data.school.type;
+                document.getElementById("school-website").href = data.school.website;
 
                 // Students list
                 const table = document.getElementById("students-table");

@@ -153,7 +153,7 @@
         });
     }
 
-    // 4️⃣ Fetch schools from backend
+    // Fetch schools from backend
     fetch("http://127.0.0.1:8000/schools")
         .then(response => response.json())
         .then(data => {
@@ -166,10 +166,14 @@
                 const marker = L.marker(
                     [school.latitude, school.longitude],
                     { icon: createIcon(color) }
-                ).addTo(map);
+                ).addTo(map);   
 
                 marker.bindPopup(`
-                    <strong>${school.name}</strong><br>
+                    <strong>
+                        <a href="${school.website}" target="_blank">
+                            ${school.name}
+                        </a>
+                    </strong><br>
                     Type: ${school.type}<br>
                     Current students: ${school.current_students}<br>
                     Historical students: ${school.total_students}<br>
@@ -180,7 +184,7 @@
             });
         });
 
-    // 5️⃣ View more action
+    // View more action
     function viewMore(id) {
         window.location.href = `school.html?id=${id}`;
     }

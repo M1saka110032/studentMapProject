@@ -3,10 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 from models import create_tables
 
-# 1️⃣ Create FastAPI app
+# Create FastAPI app
 app = FastAPI()
 
-# 2️⃣ Add CORS middleware
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],       # allow any origin (development)
@@ -15,13 +15,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3️⃣ Database name
+# Database name
 DB_NAME = "database.db"
 
-# 4️⃣ Ensure tables exist
+# Ensure tables exist
 create_tables()
 
-# 5️⃣ List all schools
+# List all schools
 @app.get("/schools")
 def get_schools():
     conn = sqlite3.connect(DB_NAME)
@@ -34,6 +34,7 @@ def get_schools():
         s.type,
         s.latitude,
         s.longitude,
+        s.website,
         COUNT(e.id) AS total_students,
         COALESCE(SUM(CASE WHEN e.status = 'current' THEN 1 ELSE 0 END), 0) AS current_students
     FROM schools s
@@ -52,8 +53,10 @@ def get_schools():
             "type": r[2],
             "latitude": r[3],
             "longitude": r[4],
+            "website": r[5],
             "total_students": r[5],
             "current_students": r[6]
+            
         })
 
     return schools
