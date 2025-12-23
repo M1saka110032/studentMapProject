@@ -92,12 +92,12 @@
     </table>
 
     <script>
-        // --- 1️⃣ Back to Map Button Logic ---
+        // --- Back to Map Button Logic ---
         document.getElementById("back-button").onclick = () => {
             window.location.href = "index.html"; // Go back to the map page
         };
 
-        // --- 2️⃣ Get school ID from URL ---
+        // --- Get school ID from URL ---
         const params = new URLSearchParams(window.location.search);
         const schoolId = params.get("id");
 
@@ -105,7 +105,7 @@
             alert("No school ID provided");
         }
 
-        // --- 3️⃣ Fetch school detail from backend ---
+        // --- Fetch school detail from backend ---
         fetch(`http://127.0.0.1:8000/schools/${schoolId}`)
             .then(response => response.json())
             .then(data => {
@@ -122,7 +122,12 @@
                     const row = document.createElement("tr");
 
                     row.innerHTML = `
-                        <td>${student.name}</td>
+                        <td>
+                        <a href="student.html?id=${student.id}">
+                            ${student.name}
+                        </a>
+                        </td>
+
                         <td class="${student.status}">
                             ${student.status === "current" ? "Currently Enrolled" : "Past Student"}
                         </td>

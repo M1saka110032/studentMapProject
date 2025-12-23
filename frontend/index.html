@@ -11,27 +11,128 @@
     />
 
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        #map { height: 100vh; width: 100%; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Parent container */
+        #map-container {
+            position: relative;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Map */
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Floating search box */
+        #search-container {
+            position: absolute;
+            top: 15px;
+            right: 50px;
+            left:auto;
+            width: 260px;
+            z-index: 1000;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        #search-results {
+            margin-top: 4px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .search-item {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .search-item:hover {
+            background-color: #f0f0f0;
+        }
     </style>
 </head>
 <body>
 
-<div id="map"></div>
+<div id="map-container">
+    <div id="search-container">
+        <input
+            type="text"
+            id="search-input"
+            placeholder="Search school or student..."
+        />
+        <div id="search-results"></div>
+    </div>
+
+    <div id="map"></div>
+</div>
+
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-    // 1️⃣ Create map centered roughly on Boston
+    // Create map centered roughly on Boston
     const map = L.map('map').setView([42.3601, -71.0589], 12);
 
-    // 2️⃣ Add OpenStreetMap tiles
+    
+    const input = document.getElementById("search-input");
+    const resultsDiv = document.getElementById("search-results");
+
+    input.addEventListener("input", () => {
+        const query = input.value.trim();
+
+        if (query.length === 0) {
+            resultsDiv.innerHTML = "";
+            return;
+        }
+
+        fetch(`http://127.0.0.1:8000/search?q=${query}`)
+            .then(res => res.json())
+            .then(data => {
+                resultsDiv.innerHTML = "";
+
+                data.forEach(item => {
+                    const div = document.createElement("div");
+                    div.className = "search-item";
+                    div.textContent =
+                        item.type === "school"
+                            ? `🏫 ${item.name}`
+                            : `👤 ${item.name}`;
+
+                    div.onclick = () => {
+                        if (item.type === "school") {
+                            window.location.href = `school.html?id=${item.id}`;
+                        } else {
+                            window.location.href = `student.html?id=${item.id}`;
+                        }
+                    };
+
+                    resultsDiv.appendChild(div);
+                });
+            });
+    });
+
+    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // 3️⃣ Marker color logic
+    // Marker color logic
     function getMarkerColor(type, currentStudents) {
         if (currentStudents === 0) return 'gray';
         if (type === 'highschool') return 'blue';

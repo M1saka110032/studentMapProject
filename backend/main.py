@@ -118,3 +118,89 @@ def get_school_detail(school_id: int):
         },
         "students": students
     }
+
+@app.get("/students/{student_id}")
+def get_student_detail(student_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Student basic info
+    cursor.execute("""
+    SELECT id, name, age, grade
+    FROM students
+    WHERE id = ?
+    """, (student_id,))
+    student = cursor.fetchone()
+
+    if student is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    # Schools this student attended
+    cursor.execute("""
+    SELECT
+        s.id,
+        s.name,
+        s.type,
+        e.status,
+        e.start_year,
+        e.end_year
+    FROM enrollments e
+    JOIN schools s ON e.school_id = s.id
+    WHERE e.student_id = ?
+    """, (student_id,))
+
+    schools = cursor.fetchall()
+    conn.close()
+
+    return {
+        "student": {
+            "id": student[0],
+            "name": student[1],
+            "age": student[2],
+            "grade": student[3]
+        },
+        "schools": [
+            {
+                "id": r[0],
+                "name": r[1],
+                "type": r[2],
+                "status": r[3],
+                "start_year": r[4],
+                "end_year": r[5]
+            } for r in schools
+        ]
+    }
+
+@app.get("/search")
+def search(q: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Search schools
+    cursor.execute("""
+    SELECT id, name
+    FROM schools
+    WHERE name LIKE ?
+    """, (f"%{q}%",))
+
+    schools = [
+        {"id": r[0], "name": r[1], "type": "school"}
+        for r in cursor.fetchall()
+    ]
+
+    # Search students
+    cursor.execute("""
+    SELECT id, name
+    FROM students
+    WHERE name LIKE ?
+    """, (f"%{q}%",))
+
+    students = [
+        {"id": r[0], "name": r[1], "type": "student"}
+        for r in cursor.fetchall()
+    ]
+
+    conn.close()
+
+    return schools + students
