@@ -1,209 +1,209 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import sqlite3
-from models import create_tables
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine, Base
+from models import Student, School
+import os
+import shutil
 
-# Create FastAPI app
+# 创建数据库表
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
-# Add CORS middleware
+# ------------------------ CORS ------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # allow any origin (development)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Database name
-DB_NAME = "database.db"
+# ------------------------ save photo ------------------------
+PHOTO_DIR = "photos"
+os.makedirs(PHOTO_DIR, exist_ok=True)
 
-# Ensure tables exist
-create_tables()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-# List all schools
+# ------------------------ school ------------------------
 @app.get("/schools")
 def get_schools():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    SELECT
-        s.id,
-        s.name,
-        s.type,
-        s.latitude,
-        s.longitude,
-        s.website,
-        COUNT(e.id) AS total_students,
-        COALESCE(SUM(CASE WHEN e.status = 'current' THEN 1 ELSE 0 END), 0) AS current_students
-    FROM schools s
-    LEFT JOIN enrollments e ON s.id = e.school_id
-    GROUP BY s.id;
-    """)
-
-    rows = cursor.fetchall()
-    conn.close()
-
-    schools = []
-    for r in rows:
-        schools.append({
-            "id": r[0],
-            "name": r[1],
-            "type": r[2],
-            "latitude": r[3],
-            "longitude": r[4],
-            "website": r[5],
-            "total_students": r[5],
-            "current_students": r[6]
-            
+    db: Session = next(get_db())
+    schools = db.query(School).all()
+    result = []
+    for s in schools:
+        total_students = len(s.students)
+        current_students = sum(1 for st in s.students if getattr(st, "status", "current") == "current")
+        result.append({
+            "id": s.id,
+            "name": s.name,
+            "type": s.type,
+            "latitude": s.latitude,
+            "longitude": s.longitude,
+            "state": getattr(s, "state", ""),
+            "total_students": total_students,
+            "current_students": current_students
         })
+    return result
 
-    return schools
-
-# 6️⃣ School detail endpoint
 @app.get("/schools/{school_id}")
 def get_school_detail(school_id: int):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-
-    # 6a. Get school info
-    cursor.execute("""
-    SELECT id, name, type, latitude, longitude, website
-    FROM schools
-    WHERE id = ?
-    """, (school_id,))
-
-    school = cursor.fetchone()
-
-    if school is None:
-        conn.close()
+    db: Session = next(get_db())
+    school = db.query(School).filter(School.id == school_id).first()
+    if not school:
         raise HTTPException(status_code=404, detail="School not found")
 
-    # 6b. Get students in this school
-    cursor.execute("""
-    SELECT
-        s.id,
-        s.name,
-        s.age,
-        s.grade,
-        e.status,
-        e.start_year,
-        e.end_year
-    FROM enrollments e
-    JOIN students s ON e.student_id = s.id
-    WHERE e.school_id = ?
-    """, (school_id,))
-
-    students_rows = cursor.fetchall()
-    conn.close()
-
     students = []
-    for r in students_rows:
+    for st in school.students:
         students.append({
-            "id": r[0],
-            "name": r[1],
-            "age": r[2],
-            "grade": r[3],
-            "status": r[4],
-            "start_year": r[5],
-            "end_year": r[6]
+            "id": st.id,
+            "name": st.name,
+            "age": st.age,
+            "grade": st.grade,
+            "photo_path": st.photo_path,
+            "status": getattr(st, "status", "current"),
+            "start_year": getattr(st, "start_year", None),
+            "end_year": getattr(st, "end_year", None)
         })
 
     return {
         "school": {
-            "id": school[0],
-            "name": school[1],
-            "type": school[2],
-            "latitude": school[3],
-            "longitude": school[4],
-            "website": school[5]
+            "id": school.id,
+            "name": school.name,
+            "type": school.type,
+            "latitude": school.latitude,
+            "longitude": school.longitude,
+            "state": getattr(school, "state", ""),
         },
         "students": students
     }
 
+# ------------------------ student ------------------------
 @app.get("/students/{student_id}")
 def get_student_detail(student_id: int):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-
-    # Student basic info
-    cursor.execute("""
-    SELECT id, name, age, grade
-    FROM students
-    WHERE id = ?
-    """, (student_id,))
-    student = cursor.fetchone()
-
-    if student is None:
-        conn.close()
+    db: Session = next(get_db())
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-
-    # Schools this student attended
-    cursor.execute("""
-    SELECT
-        s.id,
-        s.name,
-        s.type,
-        e.status,
-        e.start_year,
-        e.end_year
-    FROM enrollments e
-    JOIN schools s ON e.school_id = s.id
-    WHERE e.student_id = ?
-    """, (student_id,))
-
-    schools = cursor.fetchall()
-    conn.close()
+    
+    school_info = None
+    if student.school:
+        school_info = {
+            "id": student.school.id,
+            "name": student.school.name,
+            "type": student.school.type
+        }
 
     return {
         "student": {
-            "id": student[0],
-            "name": student[1],
-            "age": student[2],
-            "grade": student[3]
+            "id": student.id,
+            "name": student.name,
+            "age": student.age,
+            "grade": student.grade,
+            "photo_path": student.photo_path
         },
-        "schools": [
-            {
-                "id": r[0],
-                "name": r[1],
-                "type": r[2],
-                "status": r[3],
-                "start_year": r[4],
-                "end_year": r[5]
-            } for r in schools
-        ]
+        "school": school_info
     }
 
+# ------------------------ add student ------------------------
+@app.post("/students")
+async def create_student(
+    name: str = Form(...),
+    age: int = Form(...),
+    grade: str = Form(...),
+    status: str = Form(...),
+    school_id: int = Form(...),
+    photo: UploadFile = File(None)
+):
+    db: Session = next(get_db())
+    school = db.query(School).filter(School.id == school_id).first()
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found")
+
+    # save photo
+    photo_path = None
+    if photo:
+        photo_filename = f"{school_id}_{name}_{photo.filename}"
+        photo_path = os.path.join(PHOTO_DIR, photo_filename)
+        with open(photo_path, "wb") as buffer:
+            shutil.copyfileobj(photo.file, buffer)
+
+    student = Student(
+        name=name,
+        age=age,
+        grade=grade,
+        status=status,
+        school_id=school_id,
+        photo_path=photo_path
+    )
+    db.add(student)
+    db.commit()
+    db.refresh(student)
+    return {"id": student.id}
+
+# ------------------------ edit student ------------------------
+@app.put("/students/{student_id}")
+async def update_student(
+    student_id: int,
+    name: str = Form(...),
+    age: int = Form(...),
+    grade: str = Form(...),
+    status: str = Form(...),
+    school_id: int = Form(...),
+    photo: UploadFile = File(None)
+):
+    db: Session = next(get_db())
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    student.name = name
+    student.age = age
+    student.grade = grade
+    student.status = status
+    student.school_id = school_id
+
+    # update photo
+    if photo:
+        if student.photo_path and os.path.exists(student.photo_path):
+            os.remove(student.photo_path)
+        photo_filename = f"{school_id}_{name}_{photo.filename}"
+        photo_path = os.path.join(PHOTO_DIR, photo_filename)
+        with open(photo_path, "wb") as buffer:
+            shutil.copyfileobj(photo.file, buffer)
+        student.photo_path = photo_path
+
+    db.commit()
+    db.refresh(student)
+    return {"id": student.id}
+
+# ------------------------ search school ------------------------
 @app.get("/search")
 def search(q: str):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+    db: Session = next(get_db())
+    
+    schools = db.query(School).filter(School.name.ilike(f"%{q}%")).all()
+    students = db.query(Student).filter(Student.name.ilike(f"%{q}%")).all()
 
-    # Search schools
-    cursor.execute("""
-    SELECT id, name
-    FROM schools
-    WHERE name LIKE ?
-    """, (f"%{q}%",))
-
-    schools = [
-        {"id": r[0], "name": r[1], "type": "school"}
-        for r in cursor.fetchall()
+    school_results = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "type": "school",
+            "state": getattr(s, "state", ""),
+            "latitude": s.latitude,
+            "longitude": s.longitude
+        } for s in schools
     ]
 
-    # Search students
-    cursor.execute("""
-    SELECT id, name
-    FROM students
-    WHERE name LIKE ?
-    """, (f"%{q}%",))
-
-    students = [
-        {"id": r[0], "name": r[1], "type": "student"}
-        for r in cursor.fetchall()
+    student_results = [
+        {"id": s.id, "name": s.name, "type": "student"} for s in students
     ]
 
-    conn.close()
-
-    return schools + students
+    return school_results + student_results

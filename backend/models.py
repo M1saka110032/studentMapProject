@@ -1,51 +1,43 @@
-import sqlite3
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey,Float ,Enum
+from sqlalchemy.orm import relationship
+from database import Base
+import enum
 
-DB_NAME = "database.db"
+class SchoolType(str, enum.Enum):
+    highschool = "highschool"
+    university = "university"
 
-def create_tables():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
+class Student(Base):
+    __tablename__="students"
+    id = Column(Integer,primary_key=True,index=True)
+    name = Column(String,nullable=False)
+    age = Column(Integer)
+    grade = Column(String)
+    photo_url = Column(String, default="")
+    enrollments = relationship("Enrollment", back_populates="student")
 
-    # Students table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        age INTEGER,
-        grade TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
 
-    # Schools table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS schools (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        type TEXT CHECK(type IN ('highschool', 'university')) NOT NULL,
-        latitude REAL NOT NULL,
-        longitude REAL NOT NULL,
-        website TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
+class School(Base):
+    __tablename__="schools"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    type = Column(Enum(SchoolType), nullable=False)
+    state = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    website = Column(String)
+    state = Column(String)
+    enrollments = relationship("Enrollment", back_populates="school")
 
-    # Enrollments table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS enrollments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        school_id INTEGER NOT NULL,
-        status TEXT CHECK(status IN ('past', 'current')) NOT NULL,
-        start_year INTEGER,
-        end_year INTEGER,
-        FOREIGN KEY(student_id) REFERENCES students(id),
-        FOREIGN KEY(school_id) REFERENCES schools(id)
-    );
-    """)
+class Enrollment(Base):
+    __tablename__ = "enrollments"
 
-    conn.commit()
-    conn.close()
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"))
+    school_id = Column(Integer, ForeignKey("schools.id"))
+    status = Column(String)  # "current" or "past"
+    start_year = Column(Integer)
+    end_year = Column(Integer)
 
-if __name__ == "__main__":
-    create_tables()
+    student = relationship("Student", back_populates="enrollments")
+    school = relationship("School", back_populates="enrollments")

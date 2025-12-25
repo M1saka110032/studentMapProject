@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Form</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { margin-bottom: 20px; }
+        form { max-width: 600px; }
+        label { display: block; margin-top: 10px; }
+        input, select, button { width: 100%; padding: 8px; margin-top: 5px; }
+        .status-option { display: inline-block; padding: 5px 10px; border-radius: 4px; margin-right: 10px; cursor: pointer; }
+        .current { background-color: green; color: white; }
+        .past { background-color: red; color: white; }
+        #school-search-results { border: 1px solid #ccc; max-height: 150px; overflow-y: auto; }
+        .school-item { padding: 5px; cursor: pointer; }
+        .school-item:hover { background-color: #f0f0f0; }
+        #photo-preview { margin-top: 10px; max-width: 150px; max-height: 150px; display: block; }
+    </style>
+</head>
+<body>
+
+<h1 id="form-title">Add / Edit Student</h1>
+
+<form id="student-form">
+    <label>Name:
+        <input type="text" id="name" required />
+    </label>
+
+    <label>Age:
+        <select id="age"></select>
+    </label>
+
+    <label>Grade:
+        <select id="grade"></select>
+    </label>
+
+    <label>Status:
+        <div>
+            <span id="status-current" class="status-option current">Currently Enrolled</span>
+            <span id="status-past" class="status-option past">Past Student</span>
+        </div>
+    </label>
+
+    <label>School:
+        <input type="text" id="school-search" placeholder="Search school by name or state..." autocomplete="off" />
+        <div id="school-search-results"></div>
+        <input type="hidden" id="school-id" />
+        <input type="hidden" id="school-lat" />
+        <input type="hidden" id="school-lng" />
+    </label>
+
+    <label>Photo:
+        <input type="file" id="photo" accept="image/*" />
+        <img id="photo-preview" src="" alt="Photo Preview" />
+    </label>
+
+    <button type="submit">Save</button>
+</form>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const studentId = params.get("id"); // 如果有id表示编辑
+
+    const ageSelect = document.getElementById("age");
+    const gradeSelect = document.getElementById("grade");
+    const statusCurrent = document.getElementById("status-current");
+    const statusPast = document.getElementById("status-past");
+    let currentStatus = "current";
+
+    const schoolSearchInput = document.getElementById("school-search");
+    const schoolResultsDiv = document.getElementById("school-search-results");
+
+    const photoInput = document.getElementById("photo");
+    const photoPreview = document.getElementById("photo-preview");
+
+    // 填充年龄选择
+    for (let i = 10; i <= 30; i++) {
+        const option = document.createElement("option");
+        option.value = i;
+        option.textContent = i;
+        ageSelect.appendChild(option);
+    }
+
+    // 状态选择
+    statusCurrent.onclick = () => {
+        currentStatus = "current";
+        statusCurrent.classList.add("current");
+        statusPast.classList.remove("past");
+    };
+    statusPast.onclick = () => {
+        currentStatus = "past";
+        statusPast.classList.add("past");
+        statusCurrent.classList.remove("current");
+    };
+
+    // 学校搜索
+    let schoolTimeout = null;
+    schoolSearchInput.addEventListener("input", () => {
+        const query = schoolSearchInput.value.trim();
+        if (query.length === 0) {
+            schoolResultsDiv.innerHTML = "";
+            return;
+        }
+        if (schoolTimeout) clearTimeout(schoolTimeout);
+        schoolTimeout = setTimeout(() => {
+            fetch(`http://127.0.0.1:8000/schools/search?q=${query}`)
+                .then(res => res.json())
+                .then(data => {
+                    schoolResultsDiv.innerHTML = "";
+                    data.forEach(school => {
+                        const div = document.createElement("div");
+                        div.className = "school-item";
+                        div.textContent = `${school.name} (${school.state})`;
+                        div.onclick = () => {
+                            document.getElementById("school-id").value = school.id;
+                            document.getElementById("school-lat").value = school.latitude;
+                            document.getElementById("school-lng").value = school.longitude;
+                            schoolSearchInput.value = `${school.name} (${school.state})`;
+                            schoolResultsDiv.innerHTML = "";
+                            populateGradesBySchoolType(school.id);
+                        };
+                        schoolResultsDiv.appendChild(div);
+                    });
+                });
+        }, 300); // 防抖
+    });
+
+    // 预览头像
+    photoInput.addEventListener("change", () => {
+        const file = photoInput.files[0];
+        if (file) {
+            photoPreview.src = URL.createObjectURL(file);
+        }
+    });
+
+    // 根据学校类型生成年级选项
+    function populateGradesBySchoolType(schoolId) {
+        fetch(`http://127.0.0.1:8000/schools/${schoolId}`)
+            .then(res => res.json())
+            .then(data => {
+                gradeSelect.innerHTML = "";
+                const type = data.school.type;
+                let grades = [];
+                if (type === "highschool") {
+                    grades = ["9", "10", "11", "12"];
+                } else if (type === "university") {
+                    grades = ["Freshman","Sophomore","Junior","Senior","Master","PhD"];
+                }
+                grades.forEach(g => {
+                    const option = document.createElement("option");
+                    option.value = g;
+                    option.textContent = g;
+                    gradeSelect.appendChild(option);
+                });
+            });
+    }
+
+    // 编辑模式加载已有学生
+    if (studentId) {
+        fetch(`http://127.0.0.1:8000/students/${studentId}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("form-title").textContent = "Edit Student";
+                document.getElementById("name").value = data.student.name;
+                ageSelect.value = data.student.age;
+                gradeSelect.value = data.student.grade;
+                currentStatus = data.schools.length && data.schools[0].status || "current";
+                if(currentStatus === "current") {
+                    statusCurrent.classList.add("current");
+                    statusPast.classList.remove("past");
+                } else {
+                    statusPast.classList.add("past");
+                    statusCurrent.classList.remove("current");
+                }
+
+                if(data.student.photo) {
+                    photoPreview.src = data.student.photo;
+                }
+
+                if(data.schools.length) {
+                    const school = data.schools[0];
+                    schoolSearchInput.value = `${school.name} (${school.type})`;
+                    document.getElementById("school-id").value = school.id;
+                    document.getElementById("school-lat").value = school.latitude;
+                    document.getElementById("school-lng").value = school.longitude;
+                    populateGradesBySchoolType(school.id);
+                }
+            });
+    }
+
+    // 表单提交
+    document.getElementById("student-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append("name", document.getElementById("name").value);
+        formData.append("age", ageSelect.value);
+        formData.append("grade", gradeSelect.value);
+        formData.append("status", currentStatus);
+        formData.append("school_id", document.getElementById("school-id").value);
+        formData.append("latitude", document.getElementById("school-lat").value);
+        formData.append("longitude", document.getElementById("school-lng").value);
+        if(photoInput.files[0]) formData.append("photo", photoInput.files[0]);
+
+        const method = studentId ? "PUT" : "POST";
+        const url = studentId ? `http://127.0.0.1:8000/students/${studentId}` : "http://127.0.0.1:8000/students";
+
+        fetch(url, {
+            method,
+            body: formData
+        }).then(res => {
+            if(res.ok) {
+                alert("Student saved successfully");
+                window.location.href = "student.html?id=" + (studentId || "new");
+            } else {
+                alert("Failed to save student");
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
