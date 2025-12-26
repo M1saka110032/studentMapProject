@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form ,Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
-from models import Student, School
+from models import Student, School ,Achievement
 import os
 import shutil
 
@@ -207,3 +207,71 @@ def search(q: str):
     ]
 
     return school_results + student_results
+
+
+@app.get("/students/{student_id}/achievements")
+def get_student_achievements(
+    student_id: int,
+    db: Session = Depends(get_db)
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    return [
+        {
+            "id": a.id,
+            "title": a.title,
+        }
+        for a in student.achievements
+    ]
+
+
+from pydantic import BaseModel
+
+class AchievementCreate(BaseModel):
+    title: str
+    description: str | None = None
+
+
+@app.post("/students/{student_id}/achievements")
+def create_achievement(
+    student_id: int,
+    achievement: AchievementCreate,
+    db: Session = Depends(get_db)
+):
+    student = db.query(Student).filter(Student.id == student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    new_achievement = Achievement(
+        student_id=student_id,
+        title=achievement.title,
+    )
+
+    db.add(new_achievement)
+    db.commit()
+    db.refresh(new_achievement)
+
+    return {
+        "id": new_achievement.id,
+        "title": new_achievement.title,
+    }
+
+
+@app.delete("/achievements/{achievement_id}")
+def delete_achievement(
+    achievement_id: int,
+    db: Session = Depends(get_db)
+):
+    achievement = db.query(Achievement).filter(
+        Achievement.id == achievement_id
+    ).first()
+
+    if not achievement:
+        raise HTTPException(status_code=404, detail="Achievement not found")
+
+    db.delete(achievement)
+    db.commit()
+
+    return {"message": "Achievement deleted successfully"}

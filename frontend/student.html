@@ -35,6 +35,15 @@
             font-size: 16px;
             cursor: pointer;
         }
+
+        ul {
+            margin-top: 10px;
+        }
+
+        .empty {
+            color: #888;
+            font-style: italic;
+        }
     </style>
 </head>
 
@@ -45,6 +54,10 @@
 <h1 id="student-name">Loading...</h1>
 <p><strong>Age:</strong> <span id="student-age"></span></p>
 <p><strong>Grade:</strong> <span id="student-grade"></span></p>
+
+<h2>Achievements</h2>
+<ul id="achievements-list"></ul>
+<p id="no-achievements" class="empty" style="display:none;">No achievements yet.</p>
 
 <h2>Schools</h2>
 
@@ -73,7 +86,20 @@
             document.getElementById("student-name").textContent = data.student.name;
             document.getElementById("student-age").textContent = data.student.age;
             document.getElementById("student-grade").textContent = data.student.grade;
+            
+            const achList = document.getElementById("achievements-list");
+            const emptyTip = document.getElementById("no-achievements");
 
+            if (!data.achievements || data.achievements.length === 0) {
+                emptyTip.style.display = "block";
+            } else {
+                data.achievements.forEach(a => {
+                    const li = document.createElement("li");
+                    li.textContent = a.title;
+                    achList.appendChild(li);
+                });
+            }
+            
             const table = document.getElementById("schools-table");
 
             data.schools.forEach(s => {

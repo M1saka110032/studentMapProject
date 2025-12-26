@@ -14,7 +14,15 @@ class Student(Base):
     age = Column(Integer)
     grade = Column(String)
     photo_url = Column(String, default="")
+    
     enrollments = relationship("Enrollment", back_populates="student")
+
+    achievements = relationship(
+        "Achievement",
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )
+
 
 
 class School(Base):
@@ -41,3 +49,14 @@ class Enrollment(Base):
 
     student = relationship("Student", back_populates="enrollments")
     school = relationship("School", back_populates="enrollments")
+
+
+class Achievement(Base):
+    __tablename__ = "achievements"
+
+    id = Column(Integer, primary_key=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+
+    title = Column(String, nullable=False)
+
+    student = relationship("Student", back_populates="achievements")
