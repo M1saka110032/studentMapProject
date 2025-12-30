@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Add / Edit Student</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; }
+h1 { margin-bottom: 20px; }
+form { max-width: 800px; }
+label { display: block; margin-top: 10px; }
+input, select, button { width: 100%; padding: 8px; margin-top: 5px; }
+.status-option { display: inline-block; padding: 5px 10px; border-radius: 4px; margin-right: 10px; cursor: pointer; }
+.current { background-color: green; color: white; }
+.past { background-color: red; color: white; }
+#school-search-results { border: 1px solid #ccc; max-height: 150px; overflow-y: auto; }
+.school-item { padding: 5px; cursor: pointer; }
+.school-item:hover { background-color: #f0f0f0; }
+#photo-preview { margin-top: 10px; max-width: 150px; max-height: 150px; display: block; }
+.enrollment-row { border: 1px solid #ccc; padding: 8px; margin-top: 6px; position: relative; }
+.enrollment-row button.remove-enrollment { position: absolute; right: -80px; top: 10px; width: auto; }
+.achievement-row { display: flex; gap: 8px; margin-top: 6px; }
+.achievement-row input { flex: 1; }
+.achievement-row button { width: auto; }
+</style>
+</head>
+<body>
+
+<button onclick="goBack()">⬅ Back to Map</button>
+
+<h1 id="form-title">Add / Edit Student</h1>
+
+<form id="student-form">
+<label>Name:<input type="text" id="name" required /></label>
+<label>Age:<select id="age"></select></label>
+<label>Grade:<select id="grade"></select></label>
+<label>Photo:<input type="file" id="photo" accept="image/*" /><img id="photo-preview" /></label>
+
+<label>Enrollments:</label>
+<div style="display: flex; font-weight: bold;margin-left: 20px;margin-top: 5px;">
+    <span style="margin-right: 320px;">School</span>
+    <span style="margin-right: 150px;">Status</span>
+    <span style="margin-right: 35px;">Start Year</span>
+    <span>End Year</span>
+</div>
+
+<div id="enrollments-list"></div>
+<button type="button" onclick="addEnrollment()">+ Add School</button>
+
+<label>Achievements:</label>
+<div id="achievements-list"></div>
+<button type="button" onclick="addAchievement()">+ Add Achievement</button>
+
+<br><br>
+<button type="submit">Save</button>
+</form>
+
+<script>
+// -------- Basic student info --------
+const ageSelect = document.getElementById("age");
+const gradeSelect = document.getElementById("grade");
+const photoInput = document.getElementById("photo");
+const photoPreview = document.getElementById("photo-preview");
+
+for(let i=10;i<=30;i++) ageSelect.innerHTML+=`<option value="${i}">${i}</option>`;
+const grades=["9","10","11","12","Freshman","Sophomore","Junior","Senior","Master","PhD"];
+grades.forEach(g=>gradeSelect.innerHTML+=`<option value="${g}">${g}</option>`);
+
+photoInput.addEventListener("change",()=>{ if(photoInput.files[0]) photoPreview.src=URL.createObjectURL(photoInput.files[0]); });
+
+// -------- Achievements --------
+function addAchievement(title="",id=""){
+    const row=document.createElement("div");
+    row.className="achievement-row";
+    row.innerHTML=`<input type="text" value="${title}" data-id="${id}" placeholder="Achievement title" />
+                   <button type="button" onclick="this.parentElement.remove()">✕</button>`;
+    document.getElementById("achievements-list").appendChild(row);
+}
+function collectAchievements(){ return [...document.querySelectorAll(".achievement-row input")].map(i=>({id:i.dataset.id||null,title:i.value.trim()})).filter(a=>a.title); }
+
+// -------- Enrollments --------
+function addEnrollment(data={}) {
+    const currentYear = new Date().getFullYear();
+    const startYear = data.startYear || currentYear;
+    let endYear = data.endYear || currentYear;
+    if (startYear > endYear) endYear = startYear;
+
+    const row = document.createElement("div");
+    row.className = "enrollment-row";
+    row.style.display = "flex";
+    row.style.gap = "8px";
+    row.style.alignItems = "center";
+
+    row.innerHTML = `
+        <input type="text" class="school-search" placeholder="School name" value="${data.schoolName||''}" style="flex:2" autocomplete="off" />
+        <select class="status" style="flex:1">
+            <option value="current" ${data.status==="current"?"selected":""}>Current</option>
+            <option value="past" ${data.status==="past"?"selected":""}>Past</option>
+        </select>
+        <input type="number" class="start-year" value="${startYear}" style="width:80px" />
+        <input type="number" class="end-year" value="${endYear}" style="width:80px" />
+        <button type="button" class="remove-enrollment">Remove</button>
+
+        <input type="hidden" class="school-id" value="${data.schoolId||''}">
+        <input type="hidden" class="school-lat" value="${data.lat||''}">
+        <input type="hidden" class="school-lng" value="${data.lng||''}">
+        <input type="hidden" class="school-type" value="${data.type||''}">
+        <div class="school-search-results" style="position:absolute; z-index:100; background:white;"></div>
+    `;
+
+    // Remove button
+    row.querySelector(".remove-enrollment").onclick = () => row.remove();
+
+    // Start/end year validation
+    const startInput = row.querySelector(".start-year");
+    const endInput = row.querySelector(".end-year");
+    startInput.addEventListener("change",()=> {
+        if(parseInt(startInput.value) > parseInt(endInput.value)) endInput.value = startInput.value;
+    });
+    endInput.addEventListener("change",()=> {
+        if(parseInt(endInput.value) < parseInt(startInput.value)) endInput.value = startInput.value;
+    });
+
+    // ---------------------- School search ----------------------
+    const searchInput = row.querySelector(".school-search");
+    const resultsDiv = row.querySelector(".school-search-results");
+    let timeout = null;
+
+    searchInput.addEventListener("input", () => {
+        const query = searchInput.value.trim();
+        if (query.length < 2) { resultsDiv.innerHTML = ""; return; }
+
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(async () => {
+            resultsDiv.innerHTML = "";
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+                    q: query,
+                    format: "json",
+                    addressdetails: 1,
+                    limit: 5,
+                    "accept-language": "en"
+                })}`, { headers: {"Accept":"application/json"} });
+                const data = await res.json();
+                data.forEach(place => {
+                    const div = document.createElement("div");
+                    div.className = "school-item";
+                    div.textContent = place.display_name;
+                    div.style.padding = "4px";
+                    div.style.cursor = "pointer";
+                    div.onclick = () => {
+                        searchInput.value = place.display_name;
+                        row.querySelector(".school-lat").value = place.lat;
+                        row.querySelector(".school-lng").value = place.lon;
+
+                        let type = /college|university/i.test(place.type||"") || /college|university/i.test(place.class||"") ? "university" : "highschool";
+                        const uniKeywords=["university","college","institute","polytechnic","mit","harvard","stanford","caltech"];
+                        if(uniKeywords.some(k => place.display_name.toLowerCase().includes(k.toLowerCase()))) type="university";
+                        row.querySelector(".school-type").value = type;
+
+                        row.querySelector(".school-id").value = ""; // new school
+                        resultsDiv.innerHTML = "";
+                    };
+                    resultsDiv.appendChild(div);
+                });
+            } catch(e) {
+                console.error("School search error:", e);
+            }
+        }, 300);
+    });
+
+    document.getElementById("enrollments-list").appendChild(row);
+}
+
+function collectEnrollments(){
+    return [...document.querySelectorAll(".enrollment-row")].map(row=>{
+        return {
+            schoolId: row.querySelector(".school-id").value,
+            schoolName: row.querySelector(".school-search").value.trim(),
+            lat: row.querySelector(".school-lat").value,
+            lng: row.querySelector(".school-lng").value,
+            type: row.querySelector(".school-type").value,
+            status: row.querySelector(".status").value,
+            startYear: row.querySelector(".start-year").value,
+            endYear: row.querySelector(".end-year").value || null
+        };
+    });
+}
+
+// Add first enrollment by default
+addEnrollment();
+
+function resetStudentForm() {
+  document.getElementById("student-form").reset();
+
+  // reset photo preview
+  photoPreview.src = "/static/avatars/default.png";
+  photoInput.value = "";
+
+  // clear achievements
+  document.getElementById("achievements-list").innerHTML = "";
+
+  // clear enrollments and add one empty
+  document.getElementById("enrollments-list").innerHTML = "";
+  addEnrollment();
+}
+// -------- Form Submit --------
+document.getElementById("student-form").onsubmit=async e=>{
+    e.preventDefault();
+    const name=document.getElementById("name").value.trim();
+    const age=parseInt(ageSelect.value);
+    const grade=gradeSelect.value;
+    const photo=photoInput.files[0];
+    const achievements=collectAchievements();
+    let enrollments=collectEnrollments();
+
+    if(!name || !grade || enrollments.length===0){ alert("Fill required fields"); return; }
+
+    // Step1: create new schools if no schoolId
+    for(let en of enrollments){
+        if(!en.schoolId){
+            if(!en.schoolName || !en.lat || !en.lng || !en.type){
+                alert("School info incomplete");
+                return;
+            }
+            const fd = new FormData();
+            fd.append("name", en.schoolName);
+            fd.append("type", en.type.toLowerCase());
+            fd.append("latitude", parseFloat(en.lat));
+            fd.append("longitude", parseFloat(en.lng));
+
+            const res = await fetch("/schools", {
+                method: "POST",
+                body: fd
+            });
+            if(!res.ok){ alert("Failed to create school"); return; }
+            const data=await res.json();
+            en.schoolId=data.id;
+        }
+    }
+
+    // Step2: send student data
+    const fd=new FormData();
+    fd.append("name",name);
+    fd.append("age",age);
+    fd.append("grade",grade);
+    fd.append("achievements",JSON.stringify(achievements));
+    if(photo) fd.append("photo",photo);
+    fd.append("enrollments",JSON.stringify(enrollments));
+
+    try{
+        const res=await fetch("/students",{method:"POST",body:fd});
+        if(!res.ok){ console.error(await res.text()); alert("Save failed"); return; }
+        alert("Saved successfully"); window.location.href="/add_student.html";
+    }catch(err){ console.error(err); alert("Network error"); }
+};
+
+function goBack() {
+    window.location.href = "/index.html";
+}
+</script>
+
+</body>
+</html>

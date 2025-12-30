@@ -68,15 +68,18 @@
 </head>
 <body>
 
+
+
 <div id="map-container">
     <div id="search-container">
+        <button onclick="goAddStudent()"> Add Student</button>
         <input
             type="text"
             id="search-input"
             placeholder="Search school or student..."
         />
         <div id="search-results"></div>
-    </div>
+    </div>  
 
     <div id="map"></div>
 </div>
@@ -101,7 +104,7 @@
             return;
         }
 
-        fetch(`http://127.0.0.1:8000/search?q=${query}`)
+        fetch(`http://localhost:8000/search?q=${query}`)
             .then(res => res.json())
             .then(data => {
                 resultsDiv.innerHTML = "";
@@ -153,8 +156,11 @@
         });
     }
 
+    function goAddStudent() {
+        window.location.href = "/add_student.html";
+    }
     // Fetch schools from backend
-    fetch("http://127.0.0.1:8000/schools")
+    fetch("http://localhost:8000/schools")
         .then(response => response.json())
         .then(data => {
             data.forEach(school => {

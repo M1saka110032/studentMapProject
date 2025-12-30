@@ -13,7 +13,7 @@ class Student(Base):
     name = Column(String,nullable=False)
     age = Column(Integer)
     grade = Column(String)
-    photo_url = Column(String, default="")
+    photo_path = Column(String, default="")
     
     enrollments = relationship("Enrollment", back_populates="student")
 
@@ -33,8 +33,7 @@ class School(Base):
     state = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
-    website = Column(String)
-    state = Column(String)
+    website = Column(String, nullable=True)
     enrollments = relationship("Enrollment", back_populates="school")
 
 class Enrollment(Base):

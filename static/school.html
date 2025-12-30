@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>School Detail</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .info {
+            margin-bottom: 20px;
+        }
+
+        .info a {
+            color: blue;
+            text-decoration: none;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5;
+        }
+
+        .current {
+            color: green;
+            font-weight: bold;
+        }
+        .past {
+            color: gray;
+        }
+
+        #back-button {
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        #back-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+
+<body>
+
+<button id="back-button">Back to Map</button>
+
+<h1 id="school-name">Loading...</h1>
+
+<div class="info">
+    <p><strong>Type:</strong> <span id="school-type"></span></p>
+    <p>
+        <strong>Website:</strong>
+        <a id="school-website" href="#" target="_blank">Visit</a>
+    </p>
+</div>
+
+<h2>Students</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Years</th>
+        </tr>
+    </thead>
+    <tbody id="students-table"></tbody>
+</table>
+
+<script>
+/* ---------------- Back button ---------------- */
+document.getElementById("back-button").onclick = () => {
+    window.location.href = "index.html";
+};
+
+/* ---------------- Get school ID ---------------- */
+const params = new URLSearchParams(window.location.search);
+const schoolId = params.get("id");
+
+if (!schoolId) {
+    alert("No school ID provided");
+}
+
+/* ---------------- Fetch school detail ---------------- */
+fetch(`http://localhost:8000/schools/${schoolId}`)
+    .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch school");
+        return res.json();
+    })
+    .then(data => {
+
+        /* ---------- School basic info ---------- */
+        document.getElementById("school-name").textContent = data.school.name;
+        document.getElementById("school-type").textContent = data.school.type;
+
+        const websiteLink = document.getElementById("school-website");
+
+        // ⭐ CHANGED: handle missing website safely
+        if (data.school.website) {
+            websiteLink.href = data.school.website;
+            websiteLink.textContent = data.school.website;
+        } else {
+            websiteLink.textContent = "Not available";
+            websiteLink.removeAttribute("href");
+            websiteLink.style.color = "gray";
+        }
+
+        /* ---------- Students list ---------- */
+        const table = document.getElementById("students-table");
+        table.innerHTML = "";
+
+        if (!data.students || data.students.length === 0) {
+            const row = document.createElement("tr");
+            row.innerHTML = `<td colspan="3">No students found</td>`;
+            table.appendChild(row);
+            return;
+        }
+
+        data.students.forEach(s => {
+            const row = document.createElement("tr");
+
+            // ⭐ CHANGED: status comes from enrollment
+            const statusText = s.status === "current"
+                ? "Currently Enrolled"
+                : "Past Student";
+
+            row.innerHTML = `
+                <td>
+                    <a href="student.html?id=${s.id}">
+                        ${s.name}
+                    </a>
+                </td>
+                <td class="${s.status}">
+                    ${statusText}
+                </td>
+                <td>
+                    ${s.start_year || ""} - ${s.end_year || ""}
+                </td>
+            `;
+
+            table.appendChild(row);
+        });
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Failed to load school data");
+    });
+</script>
+
+</body>
+</html>
