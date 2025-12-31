@@ -13,12 +13,33 @@
         ul { margin-top: 10px; }
         .empty { color: #888; font-style: italic; }
         #student-photo { max-width: 150px; max-height: 150px; display: block; margin-top: 10px; }
+        
+        #back {
+            margin-left: 10px;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #edit {
+            margin-left: 10px;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #map {
+            margin-left: 10px;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-
+    
+<button id="map">Back to Map</button>
 <button id="back">Back</button>
-
+<button id="edit">Edit</button>
 <h1 id="student-name">Loading...</h1>
 
 <p><strong>Age:</strong> <span id="student-age"></span></p>
@@ -44,7 +65,12 @@
 
 <script>
     // 返回上一页
+    document.getElementById("map").onclick = () => { window.location.href = `/index.html`; };
+    
     document.getElementById("back").onclick = () => { history.back(); };
+    document.getElementById("edit").onclick = () => {
+        window.location.href = `/add_student.html?id=${studentId}`;
+    };
 
     // 获取 student id
     const params = new URLSearchParams(window.location.search);
