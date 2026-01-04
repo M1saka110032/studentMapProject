@@ -11,8 +11,22 @@
         th { background-color: #f5f5f5; }
         #back { margin-bottom: 20px; padding: 8px 16px; font-size: 16px; cursor: pointer; }
         ul { margin-top: 10px; }
+
+        .header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start; /* 不再顶到最右 */
+            gap: 100px;                   /* 左右间距 */
+        }
+
         .empty { color: #888; font-style: italic; }
-        #student-photo { max-width: 150px; max-height: 150px; display: block; margin-top: 10px; }
+        .photo-box {
+            width: 300px;
+            text-align: right;
+            margin-left: auto;
+            margin-right: 80px;
+        }
+        #student-photo { max-width: 400px; max-height: 200px; display: block; margin-top: 50px;}
         
         #back {
             margin-left: 10px;
@@ -33,6 +47,8 @@
             font-size: 16px;
             cursor: pointer;
         }
+
+        
     </style>
 </head>
 <body>
@@ -40,11 +56,18 @@
 <button id="map">Back to Map</button>
 <button id="back">Back</button>
 <button id="edit">Edit</button>
-<h1 id="student-name">Loading...</h1>
 
-<p><strong>Age:</strong> <span id="student-age"></span></p>
-<p><strong>Grade:</strong> <span id="student-grade"></span></p>
-<p><strong>Photo:</strong> <br><img id="student-photo" src="/static/avatar/default_avatar.png" alt="No photo" /></p>
+<div class="header">
+    <div class="info">
+        <h1 id="student-name">Loading...</h1>
+        <p><strong>Age:</strong> <span id="student-age"></span></p>
+        <p><strong>Grade:</strong> <span id="student-grade"></span></p>
+    </div>
+
+    <div class="photo-box">
+        <img id="student-photo" src="/static/photos/default_avatar.png" alt="No photo">
+    </div>
+</div>
 
 <h2>Achievements</h2>
 <ul id="achievements-list"></ul>
@@ -64,19 +87,18 @@
 </table>
 
 <script>
-    // 返回上一页
-    document.getElementById("map").onclick = () => { window.location.href = `/index.html`; };
     
+    document.getElementById("map").onclick = () => { window.location.href = `/index.html`; };
     document.getElementById("back").onclick = () => { history.back(); };
     document.getElementById("edit").onclick = () => {
         window.location.href = `/add_student.html?id=${studentId}`;
     };
 
-    // 获取 student id
+    // get student id
     const params = new URLSearchParams(window.location.search);
     const studentId = params.get("id");
 
-    // 获取学生详情
+    // get student info
     fetch(`/students/${studentId}`)
         .then(async res => {
             if (!res.ok) {
@@ -86,14 +108,13 @@
             return res.json();
         })
         .then(data => {
-            // 学生基本信息
+            // student basic info
             document.getElementById("student-name").textContent = data.student.name;
             document.getElementById("student-age").textContent = data.student.age;
             document.getElementById("student-grade").textContent = data.student.grade;
 
             const photoImg = document.getElementById("student-photo");
             if (data.student.photo_path) {
-                // ⚡ 修复点：确保图片路径以 /static/ 开头
                 photoImg.src = data.student.photo_path.startsWith("/static/") 
                                ? data.student.photo_path 
                                : `/static/${data.student.photo_path}`;
@@ -102,7 +123,7 @@
                 photoImg.alt = "No photo available";
             }
 
-            // 成就
+            // achievement
             const achList = document.getElementById("achievements-list");
             const emptyTip = document.getElementById("no-achievements");
             if (!data.achievements || data.achievements.length === 0) {
@@ -116,14 +137,18 @@
                 });
             }
 
-            // 学校信息
+            // school info
             const table = document.getElementById("schools-table");
             table.innerHTML = "";
             if (data.schools && data.schools.length > 0) {
                 data.schools.forEach(s => {
                     const row = document.createElement("tr");
                     row.innerHTML = `
-                        <td>${s.name}</td>
+                        <td>
+                            <a href="school.html?id=${s.id}">
+                                ${s.name.split(",")[0].trim()}
+                            </a>
+                        </td>
                         <td>${s.status || ""}</td>
                         <td>${s.start_year || ""}</td>
                         <td>${s.end_year || ""}</td>

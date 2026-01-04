@@ -177,7 +177,7 @@
                 marker.bindPopup(`
                     <strong>
                         <a href="${school.website}" target="_blank">
-                            ${school.name}
+                            ${school.name.split(",")[0].trim()}
                         </a>
                     </strong><br>
                     Type: ${school.type}<br>

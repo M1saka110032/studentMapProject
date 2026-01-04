@@ -8,7 +8,8 @@ import os
 import shutil
 from typing import Optional
 import json
-
+import requests
+from bs4 import BeautifulSoup
 
 
 PHOTO_DIR = "static/photos"
@@ -394,4 +395,38 @@ def delete_achievement(
 
     return {"message": "Achievement deleted successfully"}
 
+
+
+@app.post("/schools/{school_id}/detect-website")
+def detect_school_website(
+    school_id: int,
+    db: Session = Depends(get_db)
+):
+    school = db.query(School).filter(School.id == school_id).first()
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found")
+
+    if getattr(school, "website", None):
+        return {"website": school.website}
+
+    query = f"{school.name} official website"
+    url = f"https://duckduckgo.com/html/?q={query}"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    r = requests.get(url, headers=headers, timeout=10)
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    for a in soup.select("a.result__a"):
+        href = a.get("href")
+        if href and href.startswith("http"):
+            school.website = href
+            db.commit()
+            return {"website": href}
+
+    return {"website": None}
+
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
+

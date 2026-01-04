@@ -70,7 +70,7 @@
     <p><strong>Type:</strong> <span id="school-type"></span></p>
     <p>
         <strong>Website:</strong>
-        <a id="school-website" href="#" target="_blank">Visit</a>
+        <a id="school-website" style="color: gray; pointer-events: none;">Detecting...</a>
     </p>
 </div>
 
@@ -109,19 +109,30 @@ fetch(`http://localhost:8000/schools/${schoolId}`)
     .then(data => {
 
         /* ---------- School basic info ---------- */
-        document.getElementById("school-name").textContent = data.school.name;
+        const shortName = data.school.name.split(",")[0].trim();
+
+        document.getElementById("school-name").textContent = shortName;
         document.getElementById("school-type").textContent = data.school.type;
 
         const websiteLink = document.getElementById("school-website");
 
-        // ⭐ CHANGED: handle missing website safely
         if (data.school.website) {
             websiteLink.href = data.school.website;
             websiteLink.textContent = data.school.website;
+            websiteLink.target = "_blank";
         } else {
-            websiteLink.textContent = "Not available";
-            websiteLink.removeAttribute("href");
-            websiteLink.style.color = "gray";
+            fetch(`/schools/${schoolId}/detect-website`, { method: "POST" })
+                .then(res => res.json())
+                .then(w => {
+                    if (w.website) {
+                        websiteLink.href = w.website;
+                        websiteLink.textContent = w.website;
+                        websiteLink.target = "_blank";
+                    } else {
+                        websiteLink.textContent = "Not available";
+                        websiteLink.style.color = "gray";
+                    }
+                });
         }
 
         /* ---------- Students list ---------- */
