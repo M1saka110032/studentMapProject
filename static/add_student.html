@@ -33,7 +33,9 @@ input, select, button { width: 100%; padding: 8px; margin-top: 5px; }
 <label>Name:<input type="text" id="name" required /></label>
 <label>Age:<select id="age"></select></label>
 <label>Grade:<select id="grade"></select></label>
-<label>Photo:<input type="file" id="photo" accept="image/*" /><img id="photo-preview" /></label>
+<label>Photo:</label>
+<input type="file" id="photo" accept="image/*" />
+<img id="photo-preview" />
 
 <label>Enrollments:</label>
 <div style="display: flex; font-weight: bold;margin-left: 20px;margin-top: 5px;">
@@ -125,6 +127,9 @@ function addEnrollment(data={}) {
 
     const searchInput = row.querySelector(".school-search");
     const resultsDiv = row.querySelector(".school-search-results");
+    resultsDiv.style.top = "50px"; 
+    resultsDiv.style.left = "0px";
+    resultsDiv.style.width = "100%"; 
     let timeout = null;
 
     searchInput.addEventListener("input", () => {
